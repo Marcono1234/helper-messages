@@ -1,8 +1,5 @@
 name: Build and Deploy
-on: 
-  push:
-    branches:
-      - master
+on: [push, pull_request]
 jobs:
   build-and-deploy:
     name: Build and Deploy
@@ -13,13 +10,27 @@ jobs:
         with:
           persist-credentials: false
 
+      - name: Cache Node Modules
+        uses: actions/cache@v1
+        with:
+          path: ~/.npm
+          key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-node-
+            ${{ runner.os }}-
+
       - name: Install
-        run: npm ci
+        run: npm i
 
       - name: Build
         run: npm run build
 
+      - name: Test
+        run: npm test
+
       - name: Deploy
+        # Only deploy for commits on 'master'
+        if: github.event_name == 'push' && github.ref == 'refs/heads/master'
         uses: JamesIves/github-pages-deploy-action@releases/v3
         with:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
