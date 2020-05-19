@@ -61,9 +61,9 @@ $(document).ready(function () {
     });
   }
 
-  // Register global enter event
+  // Register global Ctrl + C event
   $(document).keyup(e => {
-    if (e.keyCode === 13) {
+    if (e.ctrlKey && e.keyCode === 67 && window.getSelection().toString().length === 0) {
       $("#copybutton").click();
     }
   });
@@ -79,8 +79,6 @@ $("#copybutton").click(function () {
   // get selected message id
   var id = $("select").val();
   if (id == "-1" || !dropdownMap.has(id)) {
-    // impossibru, copy button isn't enabled when there is no message selected
-    alert('you dirty hacker');
     return;
   }
 
@@ -133,6 +131,12 @@ $("select").change(function () {
   const message = dropdownMap.get(code);
   if (message.fillname.length >= 1) {
     $(".stdtext").html('<input class="form-control" type="text" placeholder="' + message.fillname[0] + '" id="fill">');
+    // Register Enter event
+    $(document).keyup(e => {
+      if (e.keyCode === 13) {
+        $("#copybutton").click();
+      }
+    });
   } else {
     $(".stdtext").html('<p class="text-muted" id="msginfo">This message doesn\'t require any extra info.</p>');
   }
