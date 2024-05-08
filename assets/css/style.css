@@ -1,6 +1,5 @@
 * {
   white-space: nowrap;
-  background-color: coral;
 }
 
 a:hover {
@@ -39,6 +38,7 @@ div.main h2 {
 }
 
 div.main div.selector select {
+  display: inline-block;
   width: 250px;
 }
 
@@ -91,4 +91,30 @@ div.stdtext {
 #copybutton {
   width: 200px;
   margin-bottom: 10px;
+}
+
+div.icon {
+  text-align: center;
+  width: 45px;
+  height: 100%;
+  position: absolute;
+  top: 0;
+  left: 0;
+  padding-top: 12px;
+  background-color: #fc9700;
+  color: white;
+  border-top-left-radius: var(--bs-alert-border-radius);
+  border-bottom-left-radius: var(--bs-alert-border-radius);
+  outline: 1px solid #fc9700;
+}
+
+div.alert {
+  --bs-alert-padding-y: 0.75rem;
+  background-color: white;
+  text-align: left;
+  padding-left: 60px;
+}
+
+div.alert-warning {
+  color: #c09853;
 }

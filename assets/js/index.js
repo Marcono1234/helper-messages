@@ -1,24 +1,31 @@
 // ES6 imports
-let { messages, variables } = require('./messages.json');
+let { messages, variables, categories } = require('./messages.json');
 window.bootstrap = require('bootstrap');
 window.$ = window.jQuery = require('jquery');
-window.Popper = require('popper.js');
+window.Popper = require('@popperjs/core');
 
 // Available projects
-const projects = ["mc", "mcd", "mcl", "mcpe", "mcapi", "mce", "bds", "realms"];
+const projects = ["mc", "mcpe", "mcd", "mcl", "mclg", "bds", "realms", "web"];
 for (const project of projects) {
-  $("#projectDropdownMenu").append($(`<a class="dropdown-item ${project}-dropdown" href="#${project.toUpperCase()}">${project.toUpperCase()}</a>`));
+  $("#projectDropdownMenu").append($(`<li><a class="dropdown-item ${project}-dropdown" href="#${project.toUpperCase()}">${project.toUpperCase()}</a></li>`));
 }
 
 // Timeout for popper copy tooltip
 var clicktimeout;
 // Currently selected project
 var project = "mc";
-// Currently selected message code
-var code = "-1";
+// Currently selected message ID
+var currentMessageId = "";
 
 // map for dropdown values and their corresponding messages
 var dropdownMap = new Map();
+
+// map for category keys and their corresponding names
+var categoryMap = new Map();
+
+for (const {category, name} of categories) {
+  categoryMap.set(category, name);
+}
 
 /**
  * Main app entry point
@@ -29,7 +36,7 @@ $(document).ready(function () {
   if (!url.includes('#')) {
     window.location.replace(url + '#MC');
   } else {
-    var id = url.substring(url.lastIndexOf('#') + 1).toLowerCase();
+    const id = url.substring(url.lastIndexOf('#') + 1).toLowerCase();
     if (projects.includes(id)) {
       project = id;
     } else {
@@ -53,7 +60,7 @@ $(document).ready(function () {
 
   // Declare dropdown onClick events for each project in the dropdown list
   for (let i in projects) {
-    $("." + projects[i] + "-dropdown").click(function () {
+    $("." + projects[i] + "-dropdown").on("click", function () {
       if (project != projects[i]) {
         project = projects[i];
         updateDisplay();
@@ -62,9 +69,9 @@ $(document).ready(function () {
   }
 
   // Register global Ctrl + C event
-  $(document).keyup(e => {
-    if (e.ctrlKey && e.keyCode === 67 && window.getSelection().toString().length === 0) {
-      $("#copybutton").click();
+  $(document).on("keyup", e => {
+    if (e.ctrlKey && e.code === "KeyC" && window.getSelection().toString().length === 0) {
+      $("#copybutton").trigger("click");
     }
   });
 
@@ -75,10 +82,10 @@ $(document).ready(function () {
 /**
  * Fired whenever the copy button is pressed
  */
-$("#copybutton").click(function () {
+$("#copybutton").on("click", function () {
   // get selected message id
-  var id = $("select").val();
-  if (id == "-1" || !dropdownMap.has(id)) {
+  const id = $("select").val();
+  if (id == "" || !dropdownMap.has(id)) {
     return;
   }
 
@@ -117,23 +124,34 @@ $("#copybutton").click(function () {
 /**
  * Fired whenever the selected message is changed
  */
-$("select").change(function () {
+$("select").on("change", function () {
   // Get dropdown value
-  code = $(this).val();
+  currentMessageId = $(this).val();
   // No message selected?
-  if (code == "-1" || !dropdownMap.has(code)) {
+  if (currentMessageId == "" || !dropdownMap.has(currentMessageId)) {
+    updateDisplayedMessage(undefined);
+  } else {
+    updateDisplayedMessage(dropdownMap.get(currentMessageId));
+  }
+});
+
+/**
+ * Updates information for the currently displayed message. Message may be `undefined`
+ * if no message is currently selected.
+ */
+function updateDisplayedMessage(message) {
+  if (!message) {
     $(".stdtext").html('<p class="text-muted" id="msginfo">Please select a message.</p>');
     $("#copybutton").attr("disabled", "");
     return;
   }
 
   // Does the message require extra filling info?
-  const message = dropdownMap.get(code);
   if (message.fillname.length >= 1) {
     $(".stdtext").html('<input class="form-control" type="text" placeholder="' + message.fillname[0] + '" id="fill">');
     // Register Enter event
-    $(document).keyup(e => {
-      if (e.keyCode === 13) {
+    $("#fill").on("keyup", e => {
+      if (e.code === "Enter") {
         $("#copybutton").click();
       }
     });
@@ -143,7 +161,15 @@ $("select").change(function () {
 
   // Enable copy button
   $("#copybutton").removeAttr("disabled");
-});
+}
+
+/**
+ * Check if the message is hidden or not.
+ * @param {{hidden: boolean | undefined}} message The message to be checked.
+ */
+function isHidden(message) {
+  return message.hidden !== undefined && message.hidden;
+}
 
 /**
  * Check if the current project matches the expected projects.
@@ -174,44 +200,54 @@ function getStringValue(val) {
  * Updates messages in the message dropdown according to the currently selected project
  */
 function updateDisplay() {
-  var text = '<option value="-1">Select a message...</option>';
-  var selected = false;
+  let text = '<option value="">Select a message...</option>';
+  let selectedMessage = undefined;
+  // Create a map for categorized messages
+  let messageMap = new Map();
   // Clear dropdown map
   dropdownMap = new Map();
   // Set project dropdown title
   $("#dropdownMenuButton").text("Project: " + project.toUpperCase());
   // Loop through message objects
-  for (let i in messages) {
+  for (const messageId in messages) {
     // Select array in array
-    var messageArray = messages[i];
-    for (let j in messageArray) {
+    const messageArray = messages[messageId];
+    for (const message of messageArray) {
       // Only get messages for current project
-      if (isExpectedProject(messageArray[j].project, project)) {
-        if (i == code) {
-          selected = true;
+      if (!isHidden(message) && isExpectedProject(message.project, project)) {
+        if (messageId == currentMessageId) {
+          selectedMessage = message;
         }
-        text += `<option value="${i}" ${i == code ? 'selected': ''}>` + messageArray[j].name + '</option>';
+        let catText = messageMap.get(message.category);
+        const option = `<option value="${messageId}"${messageId == currentMessageId ? ' selected': ''}>` + message.name + '</option>';
+        // Append option to category
+        catText = !catText ? option : catText + option;
+        messageMap.set(message.category, catText);
         // Map message to dropdown ID for later recognition
-        dropdownMap.set(i, messageArray[j]);
+        dropdownMap.set(messageId, message);
       }
     }
   }
 
-  // Update dropdown HTML
-  $(".custom-select").html(text);
-  if (!selected) {
-    // Set default panel body
-    $(".stdtext").html('<p class="text-muted" id="msginfo">Please select a message.</p>');
-    // Disable copy button (as no message is selected yet)
-    $("#copybutton").attr("disabled", "");
+  // Sort categorized messages alphabetically
+  messageMap = new Map([...messageMap].sort());
+
+  // Format dropdown menu labels
+  for (const [category, options] of messageMap.entries()) {
+    text += `<optgroup label="${categoryMap.get(category) || category}">${options}</optgroup>`
   }
+
+  // Update dropdown HTML
+  $(".form-select").html(text);
+
+  updateDisplayedMessage(selectedMessage);
 }
 
 /**
  * Calculate margin for vertical center
  */
 function getMargin() {
-  var height = $(".main").css("height");
+  const height = $(".main").css("height");
   return (height.substring(0, height.length - 2) / 2) * -1;
 }
 
@@ -227,32 +263,11 @@ function wiggle(htmlobj) {
 }
 
 /**
- * Copies text to the keyboard of a user; s/o to Dean Taylor!
- * https://stackoverflow.com/questions/400212/how-do-i-copy-to-the-clipboard-in-javascript
- * @param {string} text 
+ * Copies text to the user's clipboard.
+ * https://developer.mozilla.org/en-US/docs/Web/API/Navigator/clipboard
+ * Note: This is an asynchronous call, which can fail without notifying the caller of the failure.
+ * @param {string} text
  */
 function copyTextToClipboard(text) {
-  var textArea = document.createElement("textarea");
-  textArea.style.position = 'fixed';
-  textArea.style.top = 0;
-  textArea.style.left = 0;
-  textArea.style.width = '2em';
-  textArea.style.height = '2em';
-  textArea.style.padding = 0;
-  textArea.style.border = 'none';
-  textArea.style.outline = 'none';
-  textArea.style.boxShadow = 'none';
-  textArea.style.background = 'transparent';
-  textArea.value = text;
-  document.body.appendChild(textArea);
-  textArea.select();
-
-  try {
-    var s = document.execCommand('copy');
-    document.body.removeChild(textArea);
-    return s;
-  } catch (err) {
-    document.body.removeChild(textArea);
-    return false;
-  }
+  navigator.clipboard.writeText(text);
 }
